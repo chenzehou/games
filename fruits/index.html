@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作者玩过但不知道叫啥</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: "Arial", sans-serif;
+        }
+        canvas {
+            border-radius: 16px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+            background: #16213e;
+            display: block;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gc" width="420" height="400"></canvas>
+    <script>
+        // ---------- 配置 ----------
+        const canvas = document.getElementById('gc');
+        const ctx = canvas.getContext('2d');
+        const W = 420,
+            H = 400;
+
+        const LVLS = [2, 4, 8, 16, 32, 64, 128];
+        const COLS = ['#FF0000', '#FFD700', '#00CC00', '#0066FF', '#CC00FF', '#00CCCC', '#8B4513'];
+
+        // ---------- 状态 ----------
+        let balls = [];
+        let n = 0;
+
+        let curLv, curX, curY, curR;
+        let paused = false;
+        let fastDrop = false; // 持续下落标志
+
+        let keys = {};
+
+        // ---------- 工具 ----------
+        function rand(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function dist2(x1, y1, x2, y2) {
+            const dx = x1 - x2,
+                dy = y1 - y2;
+            return dx * dx + dy * dy;
+        }
+
+        function getRadius(lv) {
+            return 17 + lv * 7;
+        }
+
+        // ---------- 球管理 ----------
+        function spawnNewBall() {
+            curLv = rand(0, 1);
+            curR = getRadius(curLv);
+            curX = W / 2;
+            curY = curR + 10;
+            fastDrop = false; // 新球重置
+        }
+
+        function addBall() {
+            let minY = H;
+            let minLv = 7;
+            let minIdx = -1;
+            for (let i = 0; i < n; i++) {
+                if (!balls[i].live) continue;
+                const y = balls[i].y;
+                if (y < minY) {
+                    minY = y;
+                    minLv = balls[i].lv;
+                    minIdx = i;
+                } else if (y === minY && balls[i].lv < minLv) {
+                    minLv = balls[i].lv;
+                    minIdx = i;
+                }
+            }
+
+            let canAdd = true;
+            for (let i = 0; i < n; i++) {
+                if (!balls[i].live) continue;
+                if (Math.abs(curX - balls[i].x) < curR + balls[i].r &&
+                    Math.abs(curY - balls[i].y) < curR + balls[i].r) {
+                    canAdd = false;
+                    break;
+                }
+            }
+
+            if (!canAdd && minIdx !== -1) {
+                if (curLv !== 0) {
+                    balls[minIdx].y -= balls[minIdx].r * 2.5;
+                }
+            }
+
+            balls[n] = {
+                x: curX,
+                y: curY,
+                lv: curLv,
+                r: curR,
+                live: true
+            };
+            n++;
+        }
+
+        // ---------- 物理 ----------
+        function physics() {
+            for (let step = 0; step < 30; step++) {
+                for (let i = 0; i < n; i++) {
+                    if (!balls[i].live) continue;
+                    balls[i].y += 1.0;
+                }
+
+                for (let i = 0; i < n; i++) {
+                    if (!balls[i].live) continue;
+                    if (balls[i].y + balls[i].r > H) balls[i].y = H - balls[i].r;
+                    if (balls[i].x - balls[i].r < 0) balls[i].x = balls[i].r;
+                    if (balls[i].x + balls[i].r > W) balls[i].x = W - balls[i].r;
+                }
+
+                for (let i = 0; i < n; i++) {
+                    if (!balls[i].live) continue;
+                    for (let j = 0; j < n; j++) {
+                        if (i === j || !balls[j].live) continue;
+                        const d2 = dist2(balls[i].x, balls[i].y, balls[j].x, balls[j].y);
+                        const sr = balls[i].r + balls[j].r;
+                        if (d2 < sr * sr) {
+                            const ang = Math.atan2(balls[i].y - balls[j].y, balls[i].x - balls[j].x);
+                            const overlap = sr - Math.sqrt(d2);
+                            balls[i].x += Math.cos(ang) * overlap * 0.5;
+                            balls[i].y += Math.sin(ang) * overlap * 0.5;
+                            const off = (rand(0, 10) - 5) * 0.08;
+                            balls[i].x += off;
+                            if (balls[i].y < balls[j].y - 6) {
+                                const ri = balls[i].r,
+                                    rj = balls[j].r;
+                                if (rj > ri && balls[i].x < balls[j].x) {
+                                    if (rand(0, 1)) balls[i].x -= ri * 0.8;
+                                } else if (ri > rj && balls[i].x > balls[j].x) {
+                                    if (rand(0, 1)) balls[i].x += ri * 0.8;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- 合并 ----------
+        function mergeBalls() {
+            for (let k = 0; k < 5; k++) {
+                let merged = false;
+                for (let i = 0; i < n; i++) {
+                    if (!balls[i].live) continue;
+                    for (let j = i + 1; j < n; j++) {
+                        if (!balls[j].live) continue;
+                        if (balls[i].lv !== balls[j].lv) continue;
+                        const d2 = dist2(balls[i].x, balls[i].y, balls[j].x, balls[j].y);
+                        const sr = balls[i].r + balls[j].r;
+                        if (d2 <= sr * sr + 800) {
+                            balls[i].lv++;
+                            balls[i].r = getRadius(balls[i].lv);
+                            balls[j].live = false;
+                            merged = true;
+                            if (balls[i].lv >= 6) {
+                                alert('🎉 你赢了！合成 128！');
+                                document.location.reload();
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                    if (merged) break;
+                }
+                if (!merged) break;
+                physics();
+            }
+        }
+
+        // ---------- 绘制 ----------
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            for (let i = 0; i < n; i++) {
+                if (!balls[i].live) continue;
+                const b = balls[i];
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+                ctx.fillStyle = COLS[b.lv] || '#888';
+                ctx.fill();
+                ctx.shadowColor = 'rgba(255,255,255,0.2)';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(LVLS[b.lv], b.x, b.y + 1);
+            }
+
+            ctx.beginPath();
+            ctx.arc(curX, curY, curR, 0, Math.PI * 2);
+            ctx.fillStyle = COLS[curLv] || '#888';
+            ctx.fill();
+            ctx.shadowColor = 'rgba(255,255,255,0.3)';
+            ctx.shadowBlur = 12;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(LVLS[curLv], curX, curY + 1);
+
+            if (paused) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, H / 2 - 30, W, 60);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⏸ 暂停中', W / 2, H / 2);
+            }
+        }
+
+        // ---------- 判定落地 ----------
+        function isLanded() {
+            if (curY + curR >= H) return true;
+            for (let i = 0; i < n; i++) {
+                if (!balls[i].live) continue;
+                const d2 = dist2(curX, curY, balls[i].x, balls[i].y);
+                const sr = curR + balls[i].r;
+                if (d2 <= sr * sr + 4) return true;
+            }
+            return false;
+        }
+
+        // ---------- 主循环 ----------
+        function gameLoop() {
+            if (!paused) {
+                // 左右移动
+                if (keys['ArrowLeft']) {
+                    curX -= 3.5;
+                    if (curX < curR) curX = curR;
+                }
+                if (keys['ArrowRight']) {
+                    curX += 3.5;
+                    if (curX > W - curR) curX = W - curR;
+                }
+
+                // 快速下落（Enter 启动，持续到落地）
+                if (fastDrop) {
+                    curY += 5;
+                    if (isLanded()) {
+                        addBall();
+                        spawnNewBall();
+                        // fastDrop 在 spawnNewBall 里被重置为 false
+                    }
+                }
+
+                physics();
+                mergeBalls();
+
+                // 失败检测
+                for (let i = 0; i < n; i++) {
+                    if (balls[i].live && balls[i].y <= balls[i].r + 8) {
+                        alert('💔 游戏结束！堆太高了。');
+                        document.location.reload();
+                        return;
+                    }
+                }
+            }
+
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ---------- 键盘 ----------
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+
+            if (e.key === 'a' || e.key === 'A') {
+                paused = !paused;
+                e.preventDefault();
+            }
+
+            if (e.key === 'Enter') {
+                fastDrop = true; // 启动快速下落
+                e.preventDefault();
+            }
+
+            if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+            // Enter 松开不关闭 fastDrop，让它继续掉
+        });
+
+        // ---------- 初始化 ----------
+        function init() {
+            for (let i = 0; i < 200; i++) {
+                balls[i] = { x: 0, y: 0, lv: 0, r: 0, live: false };
+            }
+            spawnNewBall();
+            gameLoop();
+        }
+
+        init();
+    </script>
+</body>
+</html>

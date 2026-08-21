@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反应计时器 - 电子表 / 钟表</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: linear-gradient(145deg, #0b1a2e, #1a2f3f);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            margin: 0;
+            padding: 16px;
+        }
+        .app {
+            background: #1e3b4a;
+            padding: 30px 28px 35px;
+            border-radius: 48px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.08);
+            max-width: 750px;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 400;
+            letter-spacing: 2px;
+            color: #b3d9e8;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 26px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .mode-selector {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .mode-btn {
+            background: #2f5265;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 60px;
+            color: #c0dcec;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2);
+            flex: 0 1 auto;
+        }
+        .mode-btn.active {
+            background: #58b9d4;
+            color: #0c1f2b;
+            box-shadow: 0 0 16px #58b9d488;
+            transform: scale(1.02);
+        }
+        .mode-btn:hover { background: #3f6f86; }
+        .mode-btn.active:hover { background: #6ecae7; }
+
+        .card {
+            background: #17303e;
+            border-radius: 32px;
+            padding: 24px 20px 28px;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.5);
+            color: #e0f0f5;
+        }
+        .target-area {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 14px 20px;
+            margin-bottom: 22px;
+        }
+        .target-area label {
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+        .target-area input {
+            background: #10222e;
+            border: 1px solid #3f6a7a;
+            border-radius: 40px;
+            padding: 10px 18px;
+            width: 110px;
+            font-size: 20px;
+            color: #e6f7ff;
+            text-align: center;
+            font-weight: 600;
+            outline: none;
+            transition: 0.2s;
+        }
+        .target-area input:focus {
+            border-color: #58b9d4;
+            box-shadow: 0 0 0 3px #58b9d455;
+        }
+        .target-area button {
+            background: #58b9d4;
+            border: none;
+            border-radius: 60px;
+            padding: 10px 30px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #0b202b;
+            cursor: pointer;
+            transition: 0.15s;
+            box-shadow: 0 6px 0 #2f6b7e;
+            transform: translateY(0);
+        }
+        .target-area button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #2f6b7e;
+        }
+        .target-area button:disabled {
+            opacity: 0.4;
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #2f6b7e;
+            pointer-events: none;
+        }
+
+        .display-area {
+            background: #0f1f29;
+            border-radius: 24px;
+            padding: 16px 10px;
+            min-height: 340px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.7);
+        }
+        #clockCanvas {
+            display: block;
+            margin: 0 auto;
+            width: 280px;
+            height: 280px;
+            background: #0f1f29;
+            border-radius: 50%;
+        }
+        .digital-display {
+            font-family: 'Courier New', monospace;
+            font-size: 64px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #9ed9ff;
+            text-shadow: 0 0 20px #58b9d466;
+            background: #0b1922;
+            padding: 16px 30px;
+            border-radius: 30px;
+            border: 1px solid #2b576b;
+            min-width: 200px;
+            text-align: center;
+        }
+        .status-msg {
+            margin-top: 18px;
+            font-size: 20px;
+            color: #b0d0dd;
+            text-align: center;
+            min-height: 3em;
+        }
+        .best-score {
+            margin-top: 14px;
+            font-size: 18px;
+            color: #ffd966;
+            background: #1f3847;
+            padding: 6px 20px;
+            border-radius: 40px;
+            display: inline-block;
+            border: 1px solid #5d8a9c;
+        }
+        .again-area {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .again-area button {
+            background: #335f72;
+            border: none;
+            padding: 8px 28px;
+            border-radius: 60px;
+            color: #e8f4fa;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .again-area button:hover { background: #4a7f96; }
+        .again-area button:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 18px;
+            font-size: 14px;
+            color: #5d8396;
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <h1>⏱ 反应计时器</h1>
+
+    <div class="mode-selector">
+        <button class="mode-btn active" data-mode="digital">📟 电子表</button>
+        <button class="mode-btn" data-mode="analog">🕐 钟表</button>
+    </div>
+
+    <div class="card">
+        <div class="target-area">
+            <label for="targetInput">目标秒数</label>
+            <input type="number" id="targetInput" value="5" step="0.5" min="0.5" max="60">
+            <button id="startBtn">▶ 开始</button>
+        </div>
+
+        <div class="display-area" id="displayArea">
+            <!-- 动态内容由 js 渲染 -->
+        </div>
+
+        <div class="again-area">
+            <button id="againBtn" disabled>🔄 再来一局</button>
+        </div>
+        <div class="footer-note">最高分保存在浏览器本地</div>
+    </div>
+</div>
+<script>
+    (function(){
+        // ---------- 核心状态 ----------
+        const STATE = {
+            mode: 'digital',          // 'digital' | 'analog'
+            target: 5.0,
+            now: 0,
+            running: false,
+            finished: false,
+            startTime: 0,
+            bestScore: Infinity,      // 最小误差
+            timerId: null,
+            animFrame: null,
+            countdown: 3,
+            stopFlag: false,
+        };
+
+        // DOM 引用
+        const displayArea = document.getElementById('displayArea');
+        const targetInput = document.getElementById('targetInput');
+        const startBtn = document.getElementById('startBtn');
+        const againBtn = document.getElementById('againBtn');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+
+        // ---------- 本地存储 ----------
+        function loadBest() {
+            try {
+                const val = localStorage.getItem('reaction_timer_best');
+                if (val !== null) {
+                    const parsed = parseFloat(val);
+                    if (!isNaN(parsed) && parsed >= 0) STATE.bestScore = parsed;
+                }
+            } catch (_) {}
+        }
+        function saveBest() {
+            try {
+                localStorage.setItem('reaction_timer_best', String(STATE.bestScore));
+            } catch (_) {}
+        }
+
+        // ---------- 辅助 ----------
+        function formatTime(sec) {
+            return sec.toFixed(2);
+        }
+
+        // ---------- 绘制钟表 (Canvas) ----------
+        function drawAnalog(target, now, cx, cy, R, ctx) {
+            const W = cx*2, H = cy*2;
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景圆
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0f1f29';
+            ctx.fill();
+            ctx.strokeStyle = '#3d7b91';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 刻度 (60个)
+            for (let i = 0; i < 60; i++) {
+                const rad = Math.PI/2 - i * 2*Math.PI/60;
+                const len = (i % 5 === 0) ? 18 : 8;
+                const x1 = cx + (R - 4) * Math.cos(rad);
+                const y1 = cy - (R - 4) * Math.sin(rad);
+                const x2 = cx + (R - 4 - len) * Math.cos(rad);
+                const y2 = cy - (R - 4 - len) * Math.sin(rad);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = (i % 5 === 0) ? '#b0d0dd' : '#4a7a8a';
+                ctx.lineWidth = (i % 5 === 0) ? 2.5 : 1.5;
+                ctx.stroke();
+            }
+
+            // 红色终点基准线（满圈 = target 秒）
+            if (target > 0) {
+                const endRad = Math.PI/2 - (target / target) * 2 * Math.PI; // 其实就是 -3π/2 即 90°
+                // 但是为了更直观，显示为从12点方向顺时针转到 target 秒，但是 target 秒等于一圈，所以实际上就是指向12点？
+                // 原C++逻辑： tr = PI/2 - (tg / tg) * 2 * PI = PI/2 - 2PI = -3PI/2 即 90°（指向12点）
+                // 但为了更加直观，我们让红线指向当前目标对应的角度： 0秒=12点，target秒=12点（一圈），所以红线始终指向12点？
+                // 实际上原意是画一条终点标记线，始终指向12点方向（因为目标时间就是一圈）。保持与C++一致。
+                const rRad = Math.PI/2 - 2 * Math.PI;  // -3π/2
+                const tx1 = cx + R * Math.cos(rRad);
+                const ty1 = cy - R * Math.sin(rRad);
+                const tx2 = cx + (R - 28) * Math.cos(rRad);
+                const ty2 = cy - (R - 28) * Math.sin(rRad);
+                ctx.beginPath();
+                ctx.moveTo(tx1, ty1);
+                ctx.lineTo(tx2, ty2);
+                ctx.strokeStyle = '#ff4d6d';
+                ctx.lineWidth = 5;
+                ctx.stroke();
+            }
+
+            // 蓝色当前指针 (now / target 圈)
+            if (target > 0 && now <= target) {
+                const progress = Math.min(now / target, 1.0);
+                const ang = Math.PI/2 - progress * 2 * Math.PI;
+                const ex = cx + (R - 22) * Math.cos(ang);
+                const ey = cy - (R - 22) * Math.sin(ang);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(ex, ey);
+                ctx.strokeStyle = '#4fc3f7';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#4fc3f766';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // 小圆点
+                ctx.beginPath();
+                ctx.arc(ex, ey, 8, 0, 2*Math.PI);
+                ctx.fillStyle = '#4fc3f7';
+                ctx.shadowBlur = 16;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            } else if (target > 0 && now > target) {
+                // 超时后指针停在终点，并变红
+                const ang = Math.PI/2 - 1 * 2 * Math.PI; // 指向12点
+                const ex = cx + (R - 22) * Math.cos(ang);
+                const ey = cy - (R - 22) * Math.sin(ang);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(ex, ey);
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ff6b6b66';
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 中心点
+            ctx.beginPath();
+            ctx.arc(cx, cy, 8, 0, 2*Math.PI);
+            ctx.fillStyle = '#c0dcec';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 底部文字
+            ctx.fillStyle = '#b0d0dd';
+            ctx.font = '16px "Segoe UI", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`目标 ${target.toFixed(1)}s  当前 ${Math.min(now, target+0.5).toFixed(2)}s`, cx, cy + R + 14);
+        }
+
+        // ---------- 渲染显示区 ----------
+        function renderDisplay() {
+            const mode = STATE.mode;
+            const target = STATE.target;
+            const now = STATE.now;
+            const running = STATE.running;
+            const finished = STATE.finished;
+            const best = STATE.bestScore;
+
+            let html = '';
+
+            if (mode === 'digital') {
+                // 电子表模式
+                let timeStr = '0.00';
+                if (running || finished) {
+                    timeStr = formatTime(now);
+                } else {
+                    timeStr = '0.00';
+                }
+                const statusClass = (running && !finished) ? 'running' : (finished ? 'finished' : 'idle');
+                let statusText = '';
+                if (running && !finished) statusText = '⏳ 计时中... 按 "空格键" 停止';
+                else if (finished) statusText = '✅ 已停止';
+                else statusText = '⏸ 准备就绪';
+
+                html = `
+                    <div class="digital-display">${timeStr}</div>
+                    <div class="status-msg" style="color:${running && !finished ? '#9ed9ff' : '#b0d0dd'}">${statusText}</div>
+                    <div class="best-score">🏆 最佳误差: ${best === Infinity ? '--' : best.toFixed(4)}s</div>
+                `;
+            } else {
+                // 钟表模式
+                const canvasId = 'clockCanvas';
+                html = `
+                    <canvas id="${canvasId}" width="560" height="560" style="width:280px;height:280px;"></canvas>
+                    <div class="status-msg" style="color:${running && !finished ? '#9ed9ff' : '#b0d0dd'}">
+                        ${running && !finished ? '⏳ 计时中... 按 "空格键" 停止' : finished ? '✅ 已停止' : '⏸ 准备就绪'}
+                    </div>
+                    <div class="best-score">🏆 最佳误差: ${best === Infinity ? '--' : best.toFixed(4)}s</div>
+                `;
+                displayArea.innerHTML = html;
+                // 绘制canvas
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    drawAnalog(target, now, 280, 280, 200, ctx);
+                }
+                return; // 直接返回，因为上面已经设置了innerHTML
+            }
+
+            displayArea.innerHTML = html;
+        }
+
+        // 专门用于更新钟表canvas（不重建DOM）
+        function updateAnalogCanvas() {
+            if (STATE.mode !== 'analog') return;
+            const canvas = document.getElementById('clockCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            drawAnalog(STATE.target, STATE.now, 280, 280, 200, ctx);
+        }
+
+        // ---------- 核心游戏逻辑 ----------
+        function startGame() {
+            if (STATE.running) return;
+            const val = parseFloat(targetInput.value);
+            if (isNaN(val) || val <= 0) {
+                alert('请输入有效的目标秒数 ( > 0 )');
+                return;
+            }
+            STATE.target = Math.min(Math.max(val, 0.5), 60);
+            STATE.now = 0;
+            STATE.running = true;
+            STATE.finished = false;
+            STATE.stopFlag = false;
+            STATE.startTime = performance.now() / 1000; // 秒为单位
+            STATE.countdown = 3;
+
+            startBtn.disabled = true;
+            againBtn.disabled = true;
+
+            // 先渲染一次倒计时状态
+            renderDisplay();
+
+            // 倒计时
+            let count = 3;
+            const countInterval = setInterval(() => {
+                if (count <= 0) {
+                    clearInterval(countInterval);
+                    // 正式开始计时
+                    STATE.startTime = performance.now() / 1000;
+                    STATE.now = 0;
+                    STATE.running = true;
+                    STATE.stopFlag = false;
+                    startBtn.disabled = true;
+                    againBtn.disabled = true;
+                    // 启动主循环
+                    if (STATE.timerId) clearInterval(STATE.timerId);
+                    STATE.timerId = setInterval(() => {
+                        if (!STATE.running || STATE.stopFlag) return;
+                        const nowSec = performance.now() / 1000;
+                        STATE.now = nowSec - STATE.startTime;
+                        if (STATE.mode === 'analog') {
+                            updateAnalogCanvas();
+                            // 更新状态文字（但不动canvas结构）
+                            const statusMsg = document.querySelector('.status-msg');
+                            if (statusMsg) statusMsg.textContent = '⏳ 计时中... 按 "空格键" 停止';
+                        } else {
+                            renderDisplay();
+                        }
+                        // 自动停止（如果超过目标太多）
+                        if (STATE.now > STATE.target * 2 + 2) {
+                            stopGame();
+                        }
+                    }, 30);
+
+                    // 启动动画帧（用于钟表平滑）
+                    if (STATE.animFrame) cancelAnimationFrame(STATE.animFrame);
+                    function animLoop() {
+                        if (STATE.mode === 'analog' && STATE.running && !STATE.stopFlag) {
+                            updateAnalogCanvas();
+                        }
+                        STATE.animFrame = requestAnimationFrame(animLoop);
+                    }
+                    animLoop();
+
+                    // 更新显示
+                    if (STATE.mode === 'digital') renderDisplay();
+                    else updateAnalogCanvas();
+                    return;
+                }
+                // 显示倒计时
+                const msg = `⏳ 倒计时 ${count} ...`;
+                if (STATE.mode === 'digital') {
+                    const statusEl = document.querySelector('.status-msg');
+                    if (statusEl) statusEl.textContent = msg;
+                } else {
+                    const statusEl = document.querySelector('.status-msg');
+                    if (statusEl) statusEl.textContent = msg;
+                }
+                count--;
+            }, 1000);
+
+            // 键盘监听（空格停止）
+            function keyHandler(e) {
+                if (e.key === ' ' || e.key === 'Space') {
+                    e.preventDefault();
+                    if (STATE.running && !STATE.stopFlag && !STATE.finished) {
+                        stopGame();
+                    }
+                }
+            }
+            document.addEventListener('keydown', keyHandler);
+            // 存储引用以便移除
+            window._reactionKeyHandler = keyHandler;
+        }
+
+        function stopGame() {
+            if (!STATE.running || STATE.stopFlag || STATE.finished) return;
+            STATE.stopFlag = true;
+            STATE.finished = true;
+            STATE.running = false;
+            if (STATE.timerId) {
+                clearInterval(STATE.timerId);
+                STATE.timerId = null;
+            }
+            if (STATE.animFrame) {
+                cancelAnimationFrame(STATE.animFrame);
+                STATE.animFrame = null;
+            }
+            // 最后精准取值
+            const nowSec = performance.now() / 1000;
+            STATE.now = nowSec - STATE.startTime;
+
+            // 计算误差
+            const diff = Math.abs(STATE.now - STATE.target);
+            if (diff < STATE.bestScore) {
+                STATE.bestScore = diff;
+                saveBest();
+            }
+
+            // 显示结果
+            let grade = '';
+            if (diff < 0.05) grade = '🏅 完美!';
+            else if (diff < 0.5) grade = '🌟 非常好!';
+            else if (diff < 1) grade = '👍 不错!';
+            else if (diff < 2) grade = '😊 还行';
+            else grade = '💪 继续加油';
+
+            const resultMsg = `⏱ 用时: ${STATE.now.toFixed(4)}s\n误差: ${diff.toFixed(4)}s\n${grade}`;
+            if (STATE.mode === 'digital') {
+                // 更新显示
+                renderDisplay();
+                const statusEl = document.querySelector('.status-msg');
+                if (statusEl) statusEl.textContent = resultMsg;
+            } else {
+                updateAnalogCanvas();
+                const statusEl = document.querySelector('.status-msg');
+                if (statusEl) statusEl.textContent = resultMsg;
+            }
+
+            startBtn.disabled = false;
+            againBtn.disabled = false;
+
+            // 移除键盘监听
+            if (window._reactionKeyHandler) {
+                document.removeEventListener('keydown', window._reactionKeyHandler);
+                delete window._reactionKeyHandler;
+            }
+        }
+
+        function resetGame() {
+            if (STATE.running) return;
+            STATE.finished = false;
+            STATE.now = 0;
+            STATE.stopFlag = false;
+            startBtn.disabled = false;
+            againBtn.disabled = true;
+            renderDisplay();
+            if (STATE.mode === 'analog') updateAnalogCanvas();
+            // 移除键盘监听
+            if (window._reactionKeyHandler) {
+                document.removeEventListener('keydown', window._reactionKeyHandler);
+                delete window._reactionKeyHandler;
+            }
+        }
+
+        // ---------- UI事件绑定 ----------
+        function init() {
+            loadBest();
+            // 初始渲染
+            STATE.mode = 'digital';
+            renderDisplay();
+
+            // 模式切换
+            modeBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (STATE.running) return;
+                    modeBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    STATE.mode = this.dataset.mode;
+                    resetGame();
+                    renderDisplay();
+                    if (STATE.mode === 'analog') updateAnalogCanvas();
+                });
+            });
+
+            // 开始按钮
+            startBtn.addEventListener('click', startGame);
+
+            // 再来一局
+            againBtn.addEventListener('click', function() {
+                if (STATE.running) return;
+                resetGame();
+                // 自动开始
+                startGame();
+            });
+
+            // 目标输入框回车触发开始
+            targetInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') startGame();
+            });
+
+            // 窗口尺寸变化时重绘钟表
+            window.addEventListener('resize', function() {
+                if (STATE.mode === 'analog') updateAnalogCanvas();
+            });
+
+            // 初始禁用again
+            againBtn.disabled = true;
+
+            console.log('反应计时器已加载，最佳成绩:', STATE.bestScore);
+        }
+
+        // 等待DOM完全加载
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+</script>
+</body>
+</html>

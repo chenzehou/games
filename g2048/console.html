@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>2048</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<style>
+*{margin:0;padding:0;}
+body{
+    background:#1a1a1a;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+}
+#term{
+	width:560px;
+	ime-mode:disabled;
+}
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script>
+const S=4;
+let b=Array.from({length:S},()=>Array(S).fill(0));
+
+function ml(r){
+    let m=0;
+    let t=[0,0,0,0];
+    let k=0;
+    for(let i=0;i<S;i++){
+        if(r[i]){
+            t[k++]=r[i];
+            if(k-1!==i){
+                m=1;
+            }
+        }
+    }
+    for(let i=0;i<S-1;i++){
+        if(t[i]&&t[i]===t[i+1]){
+            t[i]*=2;
+            t[i+1]=0;
+            m=1;
+            i++;
+        }
+    }
+    k=0;
+    for(let i=0;i<S;i++){
+        if(t[i]){
+            t[k++]=t[i];
+        }
+    }
+    for(let i=k;i<S;i++){
+        t[i]=0;
+    }
+    for(let i=0;i<S;i++){
+        r[i]=t[i];
+    }
+    return m;
+}
+
+function rev(a){
+    let i=0,j=S-1;
+    while(i<j){
+        let t=a[i];
+        a[i]=a[j];
+        a[j]=t;
+        i++;
+        j--;
+    }
+}
+
+function mv(d){
+    let m=0;
+    let t=Array.from({length:S},()=>Array(S).fill(0));
+    if(d===0){
+        for(let j=0;j<S;j++){
+            for(let i=0;i<S;i++){
+                t[j][i]=b[i][j];
+            }
+            m|=ml(t[j]);
+            for(let i=0;i<S;i++){
+                b[i][j]=t[j][i];
+            }
+        }
+    }else if(d===1){
+        for(let j=0;j<S;j++){
+            for(let i=0;i<S;i++){
+                t[j][i]=b[S-1-i][j];
+            }
+            m|=ml(t[j]);
+            for(let i=0;i<S;i++){
+                b[S-1-i][j]=t[j][i];
+            }
+        }
+    }else if(d===2){
+        for(let i=0;i<S;i++){
+            m|=ml(b[i]);
+        }
+    }else{
+        for(let i=0;i<S;i++){
+            rev(b[i]);
+            m|=ml(b[i]);
+            rev(b[i]);
+        }
+    }
+    return m;
+}
+
+function gn(){
+    let e=[];
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            if(!b[i][j]){
+                e.push([i,j]);
+            }
+        }
+    }
+    if(e.length){
+        let idx=Math.floor(Math.random()*e.length);
+        b[e[idx][0]][e[idx][1]]=Math.random()<0.9?2:4;
+    }
+}
+
+function init(){
+    b=Array.from({length:S},()=>Array(S).fill(0));
+    let x1=Math.floor(Math.random()*S),y1=Math.floor(Math.random()*S);
+    b[x1][y1]=Math.random()<0.9?2:4;
+    let x2,y2;
+    do{
+        x2=Math.floor(Math.random()*S);
+        y2=Math.floor(Math.random()*S);
+    }while(x2===x1&&y2===y1);
+    b[x2][y2]=Math.random()<0.9?2:4;
+}
+
+function getbg(n){
+    const map={
+        2:47,
+        4:43,
+        8:103,
+        16:41,
+        32:44,
+        64:105,
+        128:42,
+        256:46,
+        512:45,
+        1024:100,
+        2048:101,
+    };
+    return map[n]||100;
+}
+
+function draw(){
+    term.reset();
+    term.writeln('\x1B[1;37m============= 2048 =============\x1B[0m');
+    term.writeln('\x1B[37mw:up  s:down  a:left  d:right  q:quit\x1B[0m');
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            term.write(`\x1B[30;${getbg(b[i][j])}m      \x1B[0m`);
+        }
+        term.writeln('');
+        for(let j=0;j<S;j++){
+            if(b[i][j]){
+                const s=String(b[i][j]);
+                const padL=Math.floor((6-s.length)/2);
+                const padR=6-s.length-padL;
+                term.write(`\x1B[30;${getbg(b[i][j])}m${' '.repeat(padL)}${s}${' '.repeat(padR)}\x1B[0m`);
+            }else{
+                term.write(`\x1B[30;${getbg(b[i][j])}m      \x1B[0m`);
+            }
+        }
+        term.writeln('');
+        for(let j=0;j<S;j++){
+            term.write(`\x1B[30;${getbg(b[i][j])}m      \x1B[0m`);
+        }
+        term.writeln('');
+    }
+}
+
+function win(){
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            if(b[i][j]===2048){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function lose(){
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            if(!b[i][j]){
+                return false;
+            }
+        }
+    }
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S-1;j++){
+            if(b[i][j]===b[i][j+1]){
+                return false;
+            }
+        }
+    }
+    for(let j=0;j<S;j++){
+        for(let i=0;i<S-1;i++){
+            if(b[i][j]===b[i+1][j]){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+const term=new Terminal({
+    fontSize:16,
+    fontFamily:'Consolas,"Courier New",monospace',
+    cursorBlink:false,
+});
+term.open(document.getElementById('term'));
+term.textarea.setAttribute('inputmode','latin');
+term.textarea.style.imeMode='disabled';
+term.focus();
+
+const ta=term.textarea;
+if(ta){
+    ta.setAttribute('inputmode','latin');
+    ta.setAttribute('autocorrect','off');
+    ta.setAttribute('autocapitalize','off');
+    ta.setAttribute('spellcheck','false');
+    ta.style.imeMode='disabled';
+    if('imeMode' in ta.style)
+		ta.style.imeMode='disabled';
+}
+
+function loop(){
+    draw();
+    if(win()){
+        term.writeln('\x1B[1;37m\nWin!\x1B[0m');
+		term.off('key');
+		return;
+	}
+	if(lose()){
+		term.writeln('\x1B[1;37m\nLose!\x1B[0m');
+		term.off('key');
+		return;
+	}
+}
+
+term.onKey(({key})=>{
+	const k=key;
+	let m=false;
+	switch(k){
+	case 'w':
+		m=mv(0);
+		break;
+	case 's':
+		m=mv(1);
+		break;
+	case 'a':
+		m=mv(2);
+		break;
+	case 'd':
+		m=mv(3);
+		break;
+	case 'q':
+		term.dispose();
+		return;
+	default:
+		return;
+	}
+	if(m){
+		gn();
+	}
+	loop();
+});
+
+init();
+loop();
+</script>
+</body>
+</html>

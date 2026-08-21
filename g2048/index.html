@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2048</title>
+    <style>
+        *{
+			box-sizing:border-box;
+			user-select:none;
+			-webkit-touch-callout:none;
+		}
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            margin: 0;
+            padding: 16px;
+            touch-action: pan-y;
+        }
+        .app {
+            background: #16213e;
+            padding: 30px 28px 35px;
+            border-radius: 32px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            max-width: 520px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #e0e8f0;
+            font-weight: 300;
+            letter-spacing: 4px;
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: 32px;
+        }
+        .sub {
+            text-align: center;
+            color: #7a9bb0;
+            font-size: 14px;
+            margin-bottom: 18px;
+        }
+        .score-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f1f29;
+            padding: 8px 18px;
+            border-radius: 40px;
+            margin-bottom: 20px;
+            color: #c0dcec;
+        }
+        .score-area span {
+            font-weight: 600;
+            color: #ffd966;
+            font-size: 20px;
+        }
+        .board {
+            background: #0b1922;
+            border-radius: 24px;
+            padding: 16px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.7);
+            touch-action: none;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            aspect-ratio: 1 / 1;
+        }
+        .cell {
+            background: #1a2f3f;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            font-weight: 700;
+            color: #0b1922;
+            transition: 0.1s ease;
+            aspect-ratio: 1 / 1;
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3);
+        }
+        .cell[data-val="0"] { background: #1a2f3f; color: transparent; }
+        .cell[data-val="2"] { background: #eee4da; }
+        .cell[data-val="4"] { background: #ede0c8; }
+        .cell[data-val="8"] { background: #f2b179; }
+        .cell[data-val="16"] { background: #f59563; }
+        .cell[data-val="32"] { background: #f67c5f; }
+        .cell[data-val="64"] { background: #f65e3b; }
+        .cell[data-val="128"] { background: #edcf72; }
+        .cell[data-val="256"] { background: #edcc61; }
+        .cell[data-val="512"] { background: #edc850; }
+        .cell[data-val="1024"] { background: #edc53f; }
+        .cell[data-val="2048"] { background: #edc22e; }
+        .cell[data-val="4096"] { background: #60d992; }
+        .cell[data-val="8192"] { background: #3c9a6e; }
+
+        .ctrl {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
+        .ctrl button {
+            background: #2f5265;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 60px;
+            color: #e0f0f5;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 0 #1a3340;
+            transform: translateY(0);
+            touch-action: manipulation;
+        }
+        .ctrl button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #1a3340;
+        }
+        .ctrl button:hover { background: #3f6f86; }
+        .ctrl .new-btn { background: #58b9d4; color: #0b202b; }
+        .ctrl .new-btn:hover { background: #6ecae7; }
+        .footer {
+            text-align: center;
+            margin-top: 16px;
+            color: #4a7a8a;
+            font-size: 13px;
+        }
+        @media (max-width: 480px) {
+            .app { padding: 16px; }
+            .cell { font-size: 24px; }
+            .grid { gap: 8px; }
+            .board { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <h1>2048</h1>
+    <div class="sub">方向键 / 滑动  ·  w作弊</div>
+    <div class="score-area">
+        <span>🏆 最高分</span>
+        <span id="bestScore">0</span>
+    </div>
+    <div class="board" id="board">
+        <div class="grid" id="grid"></div>
+    </div>
+    <div class="ctrl">
+        <button class="new-btn" id="newGameBtn">🔄 新游戏</button>
+        <button id="undoBtn" disabled>↩️ 撤销</button>
+    </div>
+    <div class="footer">键盘 ↑ ↓ ← →  或  WASD</div>
+</div>
+<script>
+    (function(){
+        const SIZE = 4;
+        let board = [];
+        let score = 0;
+        let bestScore = 0;
+        let gameOver = false;
+        let winFlag = false;
+
+        let history=[];
+        const MAX_HISTORY=20;
+
+        const gridEl=document.getElementById('grid');
+        const bestScoreEl=document.getElementById('bestScore');
+        function cloneBoard(b){
+            return b.map(
+				row=>row.map(v=>typeof v==='number' && !isNaN(v)?v:0)
+			);
+        }
+
+        // ---------- 本地存储 ----------
+        function loadBest() {
+            try {
+                const v = localStorage.getItem('g2048_best');
+                if (v !== null) {
+                    const n = parseInt(v, 10);
+                    if (!isNaN(n) && n > 0) bestScore = n;
+                }
+            } catch (_) {}
+        }
+        function saveBest() {
+            try {
+                localStorage.setItem('g2048_best', String(bestScore));
+            } catch (_) {}
+        }
+
+        // ---------- 核心逻辑 ----------
+        function initBoard() {
+            board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+            const pos1 = randomEmpty();
+            if (pos1) board[pos1.r][pos1.c] = Math.random() < 0.9 ? 2 : 4;
+            const pos2 = randomEmpty();
+            if (pos2) board[pos2.r][pos2.c] = Math.random() < 0.9 ? 2 : 4;
+            // 确保所有格子是数字
+            board = board.map(row => row.map(v => typeof v === 'number' && !isNaN(v) ? v : 0));
+            score = 0;
+            gameOver = false;
+            winFlag = false;
+            history = [];
+            document.getElementById('undoBtn').disabled = true;
+        }
+
+        function randomEmpty() {
+            const empties = [];
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === 0) empties.push({ r: i, c: j });
+                }
+            }
+            if (empties.length === 0) return null;
+            const idx = Math.floor(Math.random() * empties.length);
+            return empties[idx];
+        }
+
+        function spawnNew() {
+            const pos = randomEmpty();
+            if (pos) {
+                board[pos.r][pos.c] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        function mergeLine(line) {
+            let moved = false;
+            let t = [];
+            let k = 0;
+            for (let i = 0; i < SIZE; i++) {
+                const val = (typeof line[i] === 'number' && !isNaN(line[i])) ? line[i] : 0;
+                if (val !== 0) {
+                    t[k++] = val;
+                    if (k - 1 !== i) moved = true;
+                }
+            }
+            for (let i = 0; i < SIZE - 1; i++) {
+                const a = (typeof t[i] === 'number' && !isNaN(t[i])) ? t[i] : 0;
+                const b = (typeof t[i+1] === 'number' && !isNaN(t[i+1])) ? t[i+1] : 0;
+                if (a !== 0 && a === b) {
+                    t[i] = a * 2;
+                    t[i+1] = 0;
+                    moved = true;
+                    score += t[i];
+                    i++;
+                }
+            }
+            k = 0;
+            for (let i = 0; i < SIZE; i++) {
+                const val = (typeof t[i] === 'number' && !isNaN(t[i])) ? t[i] : 0;
+                if (val !== 0) t[k++] = val;
+            }
+            for (let i = k; i < SIZE; i++) t[i] = 0;
+            for (let i = 0; i < SIZE; i++) {
+                line[i] = (typeof t[i] === 'number' && !isNaN(t[i])) ? t[i] : 0;
+            }
+            return moved;
+        }
+
+        function reverse(arr) {
+            let i = 0, j = arr.length - 1;
+            while (i < j) {
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+                i++; j--;
+            }
+        }
+
+        function move(direction) {
+            let moved = false;
+            if (direction === 0) {
+                for (let j = 0; j < SIZE; j++) {
+                    let col = [];
+                    for (let i = 0; i < SIZE; i++) col.push(board[i][j]);
+                    const m = mergeLine(col);
+                    if (m) moved = true;
+                    for (let i = 0; i < SIZE; i++) board[i][j] = col[i];
+                }
+            } else if (direction === 1) {
+                for (let j = 0; j < SIZE; j++) {
+                    let col = [];
+                    for (let i = SIZE - 1; i >= 0; i--) col.push(board[i][j]);
+                    const m = mergeLine(col);
+                    if (m) moved = true;
+                    for (let i = 0; i < SIZE; i++) board[SIZE - 1 - i][j] = col[i];
+                }
+            } else if (direction === 2) {
+                for (let i = 0; i < SIZE; i++) {
+                    const m = mergeLine(board[i]);
+                    if (m) moved = true;
+                }
+            } else if (direction === 3) {
+                for (let i = 0; i < SIZE; i++) {
+                    reverse(board[i]);
+                    const m = mergeLine(board[i]);
+                    if (m) moved = true;
+                    reverse(board[i]);
+                }
+            }
+            // 兜底清理
+            board = board.map(row => row.map(v => (typeof v === 'number' && !isNaN(v)) ? v : 0));
+            return moved;
+        }
+
+        function checkWin() {
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === 2048) return true;
+                }
+            }
+            return false;
+        }
+
+        function checkLose() {
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === 0) return false;
+                }
+            }
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE - 1; j++) {
+                    if (board[i][j] === board[i][j+1]) return false;
+                }
+            }
+            for (let j = 0; j < SIZE; j++) {
+                for (let i = 0; i < SIZE - 1; i++) {
+                    if (board[i][j] === board[i+1][j]) return false;
+                }
+            }
+            return true;
+        }
+
+        function saveHistory() {
+            const copy = cloneBoard(board);
+            history.push({ board: copy, score: score });
+            if (history.length > MAX_HISTORY) history.shift();
+            document.getElementById('undoBtn').disabled = false;
+        }
+
+        function undo() {
+            if (history.length === 0) return;
+            const prev = history.pop();
+            board = cloneBoard(prev.board);
+            score = prev.score;
+            gameOver = false;
+            winFlag = false;
+            if (history.length === 0) document.getElementById('undoBtn').disabled = true;
+            render();
+        }
+
+        // ---------- 玩家操作 ----------
+        function playerMove(dir) {
+            if (gameOver) return;
+            if (typeof dir !== 'number' || isNaN(dir) || dir < 0 || dir > 3) {
+                console.warn('无效方向:', dir);
+                return;
+            }
+            saveHistory();
+            const moved = move(dir);
+            if (!moved) {
+                history.pop();
+                if (history.length === 0) document.getElementById('undoBtn').disabled = true;
+                return;
+            }
+            spawnNew();
+            if (score > bestScore) {
+                bestScore = score;
+                saveBest();
+            }
+            render();
+            if (checkWin() && !winFlag) {
+                winFlag = true;
+                setTimeout(() => alert('🎉 你赢了！ 达到 2048！'), 80);
+            }
+            if (checkLose()) {
+                gameOver = true;
+                setTimeout(() => alert('💔 游戏结束！ 没有可移动的格子了。'), 80);
+            }
+        }
+
+        // ---------- 作弊 ----------
+        function cheatWin() {
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === 0) {
+                        board[i][j] = 2048;
+                        render();
+                        if (checkWin() && !winFlag) {
+                            winFlag = true;
+                            alert('🎉 作弊成功！ 达到 2048！');
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        function cheatFill() {
+            let num = 2;
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    board[i][j] = num;
+                    num *= 2;
+                    if (num > 256) num = 2;
+                    if (j > 0 && board[i][j] === board[i][j-1]) num += 2;
+                    if (i > 0 && board[i][j] === board[i-1][j]) num += 2;
+                }
+            }
+            render();
+        }
+
+        // ---------- 渲染（带兜底） ----------
+        function render() {
+            gridEl.innerHTML = '';
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    let val = board[i][j];
+                    // 确保 val 是数字，否则置 0
+                    if (typeof val !== 'number' || isNaN(val)) val = 0;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.setAttribute('data-val', String(val));
+                    cell.textContent = val === 0 ? '' : String(val);
+                    gridEl.appendChild(cell);
+                }
+            }
+            bestScoreEl.textContent = bestScore;
+        }
+
+        // ---------- 新游戏 ----------
+        function newGame() {
+            if (confirm('确定要开始新游戏吗？ 当前进度将丢失。')) {
+                initBoard();
+                render();
+                document.getElementById('undoBtn').disabled = true;
+            }
+        }
+
+        // ---------- 键盘 ----------
+        function handleKey(e) {
+            const key = e.key;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'W', 'l', 'L'].includes(key)) {
+                e.preventDefault();
+            }
+            if (key === 'w' || key === 'W') { cheatWin(); return; }
+            if (key === 'l' || key === 'L') { cheatFill(); return; }
+            switch (key) {
+                case 'ArrowUp': playerMove(0); break;
+                case 'ArrowDown': playerMove(1); break;
+                case 'ArrowLeft': playerMove(2); break;
+                case 'ArrowRight': playerMove(3); break;
+                default: return;
+            }
+        }
+
+        // ---------- 触摸 ----------
+        let touchStartX = 0, touchStartY = 0;
+        let isTouching = false;
+
+        function handleTouchStart(e) {
+            const touch = e.touches[0];
+            if (!touch) return;
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            isTouching = true;
+        }
+
+        function handleTouchEnd(e) {
+            if (!isTouching) return;
+            isTouching = false;
+            const touch = e.changedTouches[0];
+            if (!touch) {
+                touchStartX = 0; touchStartY = 0;
+                return;
+            }
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            touchStartX = 0; touchStartY = 0;
+
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+            if (Math.max(absDx, absDy) < 20) return;
+
+            let dir = -1;
+            if (absDx > absDy) {
+                dir = dx > 0 ? 3 : 2;
+            } else {
+                dir = dy > 0 ? 1 : 0;
+            }
+            if (dir >= 0 && dir <= 3) {
+                playerMove(dir);
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+        }
+
+        // ---------- 初始化 ----------
+        function init() {
+            loadBest();
+            initBoard();
+            render();
+            document.addEventListener('keydown', handleKey);
+
+            const boardEl = document.getElementById('board');
+            boardEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+            boardEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+            boardEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+            document.getElementById('newGameBtn').addEventListener('click', newGame);
+            document.getElementById('undoBtn').addEventListener('click', undo);
+
+            window.addEventListener('keydown', function(e) {
+                if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
