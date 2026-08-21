@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>井字棋</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<style>
+*{margin:0;padding:0;}
+body{
+    background:#1a1a1a;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+}
+#term{width:480px;}
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script>
+const S=3;
+let b=Array.from({length:S},()=>Array(S).fill(0));
+function mv(x,y,p){
+    if(x<0||x>2||y<0||y>2||b[x][y]!==0){
+        return 0;
+    }
+    b[x][y]=p;
+    return 1;
+}
+function win(){
+    let f=true;
+    for(let i=0;i<S;i++){
+        if(b[i][0]===b[i][1]&&b[i][1]===b[i][2]&&b[i][0]!==0){
+            return b[i][0];
+        }
+        if(b[0][i]===b[1][i]&&b[1][i]===b[2][i]&&b[0][i]!==0){
+            return b[0][i];
+        }
+    }
+    if(b[0][0]===b[1][1]&&b[1][1]===b[2][2]&&b[0][0]!==0){
+        return b[0][0];
+    }
+    if(b[0][2]===b[1][1]&&b[1][1]===b[2][0]&&b[0][2]!==0){
+        return b[0][2];
+    }
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            if(b[i][j]===0){
+                f=false;
+            }
+        }
+    }
+    return f?3:0;
+}
+function pr(){
+    let out='\x1B[1m============== 井字棋 ==============\x1B[0m\n';
+    for(let i=0;i<S;i++){
+        for(let j=0;j<S;j++){
+            const val=b[i][j];
+            const c=val===0?'-':(val===1?'X':'O');
+            if(val===1){
+                out+='\x1B[34m  '+c+'  \x1B[0m';
+            }else if(val===2){
+                out+='\x1B[31m  '+c+'  \x1B[0m';
+            }else{
+                out+='  '+c+'  ';
+            }
+            if(j<S-1){
+                out+='|';
+            }
+        }
+        if(i<S-1){
+            out+='\n-----+-----+-----\n';
+        }
+    }
+    out+='\n';
+    return out;
+}
+let who=1;
+let winn=0;
+let waitinginput=false;
+let inputbuf='';
+let step=0;
+let pendingx;
+function resetgame(){
+    b=Array.from({length:S},()=>Array(S).fill(0));
+    who=1;
+    winn=0;
+    waitinginput=false;
+    inputbuf='';
+    step=0;
+    render();
+}
+function render(){
+    let output='\x1B[2J\x1B[H';
+    output+=pr();
+    if(winn!==0){
+        if(winn===3){
+            output+='\x1B[33m\n平局!\x1B[0m\n';
+        }else{
+            output+='\x1B[32m\n玩家'+winn+'赢了!\x1B[0m\n';
+        }
+        term.write(output);
+        return;
+    }
+    const playerc=who===1?'\x1B[34mX\x1B[0m':'\x1B[31mO\x1B[0m';
+    output+='\x1B[36m玩家'+who+' ('+playerc+'\x1B[36m) 请输入坐标(1-3 1-3,空格分隔):\x1B[0m';
+    term.write(output);
+    waitinginput=true;
+    inputbuf='';
+    step=0;
+}
+function handleinput(input){
+    if(!waitinginput||winn!==0){
+        return;
+    }
+    for(const ch of input){
+        if(ch===' '||ch==='\r'||ch==='\n'){
+            if(inputbuf.length>0){
+                processnumber(inputbuf);
+                inputbuf='';
+            }
+            if(step===2){
+                return;
+            }
+            continue;
+        }
+        if(ch>='1'&&ch<='3'){
+            inputbuf+=ch;
+            if(inputbuf.length===2&&step===0){
+                const x=parseInt(inputbuf[0])-1;
+                const y=parseInt(inputbuf[1])-1;
+                inputbuf='';
+                step=0;
+                trymove(x,y);
+                return;
+            }
+        }else if(ch==='\b'){
+            if(inputbuf.length>0){
+                inputbuf=inputbuf.slice(0,-1);
+            }
+        }
+    }
+}
+function processnumber(numstr){
+    if(step===0){
+        const x=parseInt(numstr)-1;
+        if(x>=0&&x<S){
+            pendingx=x;
+            step=1;
+        }else{
+            term.write('\r\n\x1B[31m输入超出棋盘范围,请重新输入!\x1B[0m\r\n');
+            waitinginput=false;
+            setTimeout(()=>{
+                render();
+            },300);
+        }
+    }else if(step===1){
+        const y=parseInt(numstr)-1;
+        if(y>=0&&y<S){
+            const x=pendingx;
+            trymove(x,y);
+        }else{
+            term.write('\r\n\x1B[31m输入超出棋盘范围,请重新输入!\x1B[0m\r\n');
+            waitinginput=false;
+            setTimeout(()=>{
+                render();
+            },300);
+        }
+    }
+}
+function trymove(x,y){
+    if(mv(x,y,who)){
+        winn=win();
+        who=who===1?2:1;
+        waitinginput=false;
+        render();
+        if(winn!==0){
+            setTimeout(()=>{
+                term.write('\r\n\x1B[33m按任意键重新开始...\x1B[0m');
+            },100);
+        }
+    }else{
+        term.write('\r\n\x1B[31m位置非空!请重新输入...\x1B[0m\r\n');
+        waitinginput=false;
+        setTimeout(()=>{
+            render();
+        },300);
+    }
+}
+const term=new Terminal({
+    fontSize:18,
+    fontFamily:'Consolas,"Courier New",monospace',
+    cursorBlink:false,
+    cursorStyle:'block',
+    convertEol:true,
+});
+term.open(document.getElementById('term'));
+term.focus();
+let inputacc='';
+term.onKey(({key,domEvent})=>{
+    const ev=domEvent;
+    if(winn!==0){
+        if(key==='\r'||key===' '){
+            resetgame();
+        }
+        return;
+    }
+    if(key==='\r'){
+        if(inputacc.length>0){
+            handleinput(inputacc);
+            inputacc='';
+        }
+        return;
+    }
+    if(key==='\x7f'){
+        if(inputacc.length>0){
+            inputacc=inputacc.slice(0,-1);
+            term.write('\b \b');
+        }
+        return;
+    }
+    if((key>='1'&&key<='3')||key===' '){
+        inputacc+=key;
+        term.write(key);
+        const digits=inputacc.replace(/ /g,'');
+        if(digits.length>=2){
+            const x=parseInt(digits[0])-1;
+            const y=parseInt(digits[1])-1;
+            if(x>=0&&x<S&&y>=0&&y<S){
+                term.write('\r\n');
+                handleinput(inputacc);
+                inputacc='';
+            }else{
+                term.write('\r\n\x1B[31m输入超出棋盘范围,请重新输入!\x1B[0m\r\n');
+                inputacc='';
+                setTimeout(()=>{
+                    render();
+                },300);
+            }
+        }
+    }
+});
+term.onData(()=>{
+});
+resetgame();
+term.onKey(({key})=>{
+    if(winn!==0&&(key==='\r'||key===' '));
+});
+</script>
+</body>
+</html>
